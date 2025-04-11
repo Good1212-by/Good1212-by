@@ -1,0 +1,232 @@
+--# Using Common Table Expressions "CTE"
+SELECT * FROM bakery.customer_orders;
+
+SELECT product_id , SUM(order_total), SUM(tip), COUNT(tip)
+FROM customer_orders
+WHERE tip != 0
+GROUP BY product_id;
+
+WITH CTE_example AS
+(
+    SELECT product_id , SUM(order_total), SUM(tip), COUNT(tip)
+    FROM customer_orders
+    WHERE tip != 0
+    GROUP BY product_id
+)
+SELECT * 
+FROM CTE_example
+WHERE `SUM(tip)` > 3;
+
+
+WITH CTE_example AS
+(
+    SELECT product_id , SUM(order_total), SUM(tip), COUNT(tip)
+    FROM customer_orders
+    WHERE tip != 0
+    GROUP BY product_id
+)
+SELECT product_id, SUM(tip)/COUNT(tip)
+FROM CTE_example
+WHERE `SUM(tip)` > 3;
+
+WITH CTE_example (product_id, sum_order_total, sum_tip, count_tip) AS
+(
+SELECT product_id , SUM(order_total), SUM(tip), COUNT(tip)
+FROM customer_orders
+WHERE tip != 0
+GROUP BY product_id
+)
+SELECT product_id ,ROUND(sum_tip/count_tip,2) 
+FROM CTE_example;
+
+# USING SUBQUERY 
+
+SELECT product_id, ROUND(`SUM(tip)`/`COUNT(tip)`,2) 
+FROM (SELECT product_id,SUM(order_total), SUM(tip), COUNT(tip) 
+FROM customer_orders
+WHERE tip != 0
+GROUP BY product_id) Subquery_example
+GROUP BY product_id ;
+
+# RECURSION CTE buyu ooriigoo dahin duudah
+SELECT * 
+FROM employees ;
+
+WITH RECURSIVE CTE_example AS
+(
+    SELECT 1 AS X
+UNION ALL
+SELECT x + 1
+FROM CTE_example
+WHERE x < 10
+)
+SELECT  x
+FROM CTE_example;
+
+SELECT * FROM employees;
+
+WITH RECURSIVE Company_hierarchy AS
+(
+    SELECT employee_id, first_name, last_name, boss_id, 0 AS hierarchy_level
+    FROM employees
+    WHERE boss_id IS NULL
+
+    UNION ALL
+
+    SELECT e.employee_id, e.first_name, e.last_name, e.boss_id, ch.hierarchy_level + 1
+    FROM employees e , company_hierarchy ch
+    WHERE e.boss_id = ch.employee_id
+)
+   SELECT ch.first_name Employee_first_name, ch.last_name Employee_last_name, e.first_name  Boss_first_name, e.last_name Boss_last_name, 
+   hierarchy_level
+   FROM company_hierarchy ch 
+   JOIN employees e ON ch.boss_id = e.employee_id;
+
+# USING TEMPORARY TABLES 
+CREATE TEMPORARY TABLE temp_table 
+(first_name VARCHAR(50), last_name VARCHAR(50), Favorite_movie VARCHAR(100));
+SELECT * FROM temp_table;
+# now temp tabledee data hiih 
+INSERT INTO temp_table 
+VALUES ('John', 'Doe', 'The Matrix'),
+('Muug', 'Md', 'The Godfather'),
+('Narhan', 'Smith', 'The Shawshank Redemption'),
+('Otgo', 'Smith', 'I love you');
+
+SELECT * FROM temp_table;
+
+CREATE TEMPORARY TABLE Tur_table AS
+SELECT first_name, last_name, salary
+FROM employees
+WHERE department ='bakery' ;
+
+CREATE TEMPORARY TABLE Tur_table1 AS
+SELECT *
+FROM employees
+WHERE salary > 50000 ;
+
+/* Temp table & CTEs . How they're stored in memory .How they handle complex queries */
+WITH  CTE_example AS
+(
+SELECT * , 
+ROW_NUMBER() OVER (PARTITION BY department ORDER BY salary DESC) AS row_num 
+FROM employees
+)
+SELECT *
+FROM CTE_example
+WHERE row_num > 2;
+
+CREATE TEMPORARY TABLE Tvr_table AS
+(
+SELECT * ,
+ROW_NUMBER() OVER (PARTITION BY department ORDER BY salary DESC) AS row_num
+FROM employees
+);  
+SELECT * FROM Tvr_table;
+
+# Stored Procedures 
+SELECT * FROM customer_orders
+WHERE order_total > 10;
+
+CREATE PROCEDURE Muugii_orders()
+SELECT * FROM customer_orders
+WHERE order_total > 10;
+
+CALL Muugii_orders();
+DELIMITER $$
+CREATE PROCEDURE Muugii_orders2()
+SELECT * FROM customer_orders
+WHERE order_total > 10;
+SELECT * FROM customer_orders
+WHERE order_total > 10;
+
+DELIMITER $$
+CREATE PROCEDURE Muugii_orders4()
+BEGIN
+SELECT * FROM customer_orders
+WHERE order_total > 10;
+END $$
+DELIMITER ;
+# Parameters in Stored Procedures
+DROP PROCEDURE IF EXISTS orders_by_product;
+DELIMITER $$
+CREATE PROCEDURE orders_by_product(p_product_id INT)
+BEGIN
+SELECT * FROM customer_orders
+WHERE product_id =p_product_id;
+END $$
+DELIMITER ;
+
+CALL orders_by_product(1001);
+
+# Default values for parameters
+DROP PROCEDURE IF EXISTS orders_by_product;
+DELIMITER $$
+CREATE PROCEDURE orders_by_product(p_product_id INT)
+BEGIN
+IF p_product_id IS NULL THEN
+SET p_product_id = 1001;
+END IF;
+SELECT * FROM customer_orders
+WHERE product_id =p_product_id;
+END $$
+DELIMITER ;
+CALL orders_by_product(1001);
+CALL orders_by_product(NULL);
+CALL orders_by_product(1002);
+
+# OUT parameters
+DROP PROCEDURE IF EXISTS orders_by_product;
+DELIMITER $$
+CREATE PROCEDURE orders_by_product(p_product_id INT, OUT p_order_count INT)
+BEGIN
+SELECT COUNT(*) INTO p_order_count
+FROM customer_orders
+WHERE product_id =p_product_id;
+END $$
+DELIMITER ;
+CALL orders_by_product(1001, @order_count);
+SELECT @order_count;
+
+# INOUT parameters
+DROP PROCEDURE IF EXISTS orders_by_product;
+DELIMITER $$
+CREATE PROCEDURE orders_by_product(INOUT p_product_id INT)
+BEGIN
+IF p_product_id IS NULL THEN
+SET p_product_id = 1001;
+END IF;
+SELECT * FROM customer_orders
+WHERE product_id =p_product_id;
+END $$
+DELIMITER ;
+SET @product_id = 1001;
+CALL orders_by_product(@product_id);
+SELECT @product_id;
+
+# Stored Functions
+DROP FUNCTION IF EXISTS total_orders;
+DELIMITER $$
+CREATE FUNCTION total_orders(p_product_id INT) RETURNS INT
+begin
+DECLARE total INT;
+SELECT COUNT(*) INTO total
+FROM customer_orders
+WHERE product_id = p_product_id;
+RETURN total
+END $$
+DELIMITER ;
+;  
+# Session vs Local Variables  in Stored Procedures
+DROP PROCEDURE IF EXISTS sum_of_orders;
+DELIMITER $$
+CREATE PROCEDURE sum_of_orders(p_product_id INT,OUT sum_totals DECIMAL(10,2))
+BEGIN
+     SELECT SUM(order_total) INTO sum_totals
+     FROM customer_orders
+     WHERE product_id = p_product_id;
+END $$
+DELIMITER ;
+SET @sum_totals = 0;
+CALL sum_of_orders(1001,@sum_totals);
+SELECT @sum_totals; 
